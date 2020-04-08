@@ -29,7 +29,7 @@ mod submitter;
 use config::{Config, Target};
 use submitter::FlagBatcher;
 
-const FLAG_REGEX: &str = "FLAG_[a-zA-Z0-9-_]{32}";
+const FLAG_REGEX: &str = r"FLAG\{[a-zA-Z0-9-_]{32}\}";
 
 const PRIMARY_KEY: &str = "IP";
 
@@ -117,7 +117,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let process_config = proc::ProcessConfig {
         flag_regex,
-        flag_handler,
+        flag_handler: flag_handler.clone(),
         print_stdout: opts.stdout,
         print_stderr: opts.stderr,
         timeout: Duration::from_secs_f64(config.timeout),
@@ -156,6 +156,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         while active != 0 {
             jobs.next().await;
             active -= 1;
+        }
+
+        {
+            flag_handler.lock().await.flush().await;
         }
 
         let elapsed = started_at.elapsed();

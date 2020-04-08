@@ -48,4 +48,8 @@ impl FlagHandler {
         let flag = flag.to_string();
         self.flag_batcher.submit(flag).await;
     }
+
+    pub async fn flush(&mut self) {
+        self.flag_batcher.flush().await;
+    }
 }
