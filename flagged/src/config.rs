@@ -35,10 +35,16 @@ pub struct Target {
     pub args: Vec<String>,
     pub env: HashMap<String, String>,
     pub cwd: String,
+    pub key: String,
 }
 
 impl Target {
-    pub fn new(command_template: &[String], data: &HashMap<String, Value>, cwd: String) -> Target {
+    pub fn new(
+        primary_key: &str,
+        command_template: &[String],
+        data: &HashMap<String, Value>,
+        cwd: String,
+    ) -> Target {
         let mut env = HashMap::new();
         let mut args = Vec::new();
 
@@ -58,7 +64,17 @@ impl Target {
             args.push(arg);
         }
 
-        Target { env, args, cwd }
+        let key = env
+            .get(primary_key)
+            .expect("key PRIMARY_KEY (usually 'IP') missing for target")
+            .clone();
+
+        Target {
+            env,
+            args,
+            cwd,
+            key,
+        }
     }
 
     pub fn prepare(&self) -> Command {

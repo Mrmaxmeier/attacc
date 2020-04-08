@@ -1,3 +1,17 @@
+// TODOS:
+// - fix non-utf8 stdout
+// - publish data to redis
+// => each pubsub entry should contain some kind of uuid for the session, timestamp
+// => announce hostname, expoit name, config, ... on startup, keep this in redis `sessions/${uuid}`?
+// => announce interval start/end
+// => announce exploit run start, flags, stdout/err lines
+// => announce pending flags
+// => announce flag status returned by server
+// - support multiple events without recompiling? => introduce key in attacc.json?
+// - save stdout, stderr to disk?
+// - save flag status to disk?
+// - save interval index to disk => allow fair restarts?
+
 use clap::Clap;
 use futures::stream::{FuturesUnordered, StreamExt};
 use std::sync::Arc;
@@ -5,22 +19,28 @@ use tokio::sync::Mutex;
 
 use std::fs::File;
 use std::path::Path;
-use std::process::Stdio;
 use std::time::{Duration, Instant};
 
 mod config;
 mod flaghandler;
+mod proc;
 mod submitter;
 
 use config::{Config, Target};
+use submitter::FlagBatcher;
 
 const FLAG_REGEX: &str = "FLAG_[a-zA-Z0-9-_]{32}";
+
+const PRIMARY_KEY: &str = "IP";
 
 #[derive(Clap, Debug)]
 struct Opts {
     /// Config file path.
     #[clap(short = "c", long = "config", default_value = "attacc.json")]
     config: String,
+    /// Report exploit status to redis. The URL format is redis://[:<passwd>@]<hostname>[:port][/<db>]
+    #[clap(long = "stats-uri")]
+    stats_uri: Option<String>,
     /// Working directory. If ommited, the current working directory will be used
     path: Option<String>,
 
@@ -64,8 +84,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config_file = File::open(config_path).expect("failed to open config");
     let mut config: Config = serde_json::from_reader(config_file).expect("failed to parse json");
 
-    let flag_handler = Arc::new(Mutex::new(flaghandler::FlagHandler::new()));
-    let flag_parser = flaghandler::FlagParser::new(FLAG_REGEX);
+    let flag_regex = regex::bytes::Regex::new(FLAG_REGEX).expect("invalid flag regex");
 
     if opts.debug {
         opts.concurrency = opts.concurrency.or(Some(1));
@@ -78,33 +97,58 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     config.timeout = opts.timeout.unwrap_or(config.timeout);
 
     if opts.debug || opts.dump_config {
-        config.explain(&flag_parser.regex);
+        config.explain(&flag_regex);
     }
+
+    let redis_connection = opts.stats_uri.map(|uri| {
+        redis::Client::open(uri)
+            .expect("invalid redis uri")
+            .get_connection()
+            .expect("failed to connect to redis server")
+    });
 
     if opts.dump_config {
         return Ok(());
     }
 
+    let submitter = submitter::TcpSubmitter::new("127.0.0.1:31337".parse().unwrap());
+    let flag_batcher = FlagBatcher::start(submitter);
+    let flag_handler = Arc::new(Mutex::new(flaghandler::FlagHandler::new(flag_batcher)));
+
+    let process_config = proc::ProcessConfig {
+        flag_regex,
+        flag_handler,
+        print_stdout: opts.stdout,
+        print_stderr: opts.stderr,
+        timeout: Duration::from_secs_f64(config.timeout),
+    };
+
     let mut jobs = FuturesUnordered::new();
     // NOTE: `active` vastly over-estimates actives jobs for well-behaving exploits
     let mut active = 0;
 
+    let targets = config
+        .targets
+        .iter()
+        .map(|target| {
+            Arc::new(Target::new(
+                PRIMARY_KEY,
+                &config.command,
+                target,
+                folder.clone(),
+            ))
+        })
+        .collect::<Vec<_>>();
+
     loop {
         println!("Starting interval...");
         let started_at = Instant::now();
-        for target in &config.targets {
+        for target in &targets {
             if active == config.concurrency {
                 jobs.next().await;
                 active -= 1;
             }
-            let target = Target::new(&config.command, target, folder.clone());
-            let mut command = target.prepare();
-            command.stdout(Stdio::piped());
-            command.stderr(Stdio::piped());
-            let proc = command.spawn().expect("failed to spawn process"); // TODO: make this configurable?
-            jobs.push(async {
-                proc.wait_with_output().await.unwrap();
-            });
+            jobs.push(process_config.spawn(target.clone()));
             active += 1;
         }
 
