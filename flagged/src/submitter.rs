@@ -1,50 +1,16 @@
-use std::io::{BufRead, BufReader, Write};
+use crate::ctfapi::Submitter;
 use std::time::Duration;
 use tokio::sync::{mpsc, oneshot};
 
 const BATCH_SIZE_LIMIT: usize = 50;
 const BATCH_TIME_LIMIT: Duration = Duration::from_millis(1000);
 
-pub struct TcpSubmitter {
-    addr: std::net::SocketAddr,
-}
-
-impl TcpSubmitter {
-    pub fn new(addr: std::net::SocketAddr) -> Self {
-        TcpSubmitter { addr }
-    }
-
-    pub fn submit_batch(&self, batch: &[String]) -> std::io::Result<()> {
-        use std::net::TcpStream;
-        let mut stream = TcpStream::connect(self.addr)?;
-        let mut data = Vec::new();
-        for flag in batch {
-            data.extend_from_slice(flag.as_bytes());
-            data.push(b'\n');
-        }
-        stream.write_all(&data)?;
-        let mut reader = BufReader::new(stream);
-        let mut status = String::new();
-        for flag in batch {
-            let size = reader.read_line(&mut status)?;
-            status.truncate(size);
-            if status.ends_with("\n") {
-                status.truncate(size - 1);
-            }
-            println!("{} -> {}", flag, status);
-            // TODO: send to redis and persist to disk?
-            status.clear();
-        }
-        Ok(())
-    }
-}
-
 pub struct FlagBatcher {
     pub tx: mpsc::Sender<String>,
     pub flushtx: mpsc::Sender<oneshot::Sender<()>>,
 }
 impl FlagBatcher {
-    pub fn start(submitter: TcpSubmitter) -> Self {
+    pub fn start(submitter: Box<dyn Submitter + Sync + Send>) -> Self {
         let (tx, rx) = mpsc::channel(BATCH_SIZE_LIMIT);
         let (flushtx, flushrx) = mpsc::channel(1);
         tokio::spawn(Self::watchdog(rx, flushrx, submitter));
@@ -54,7 +20,7 @@ impl FlagBatcher {
     async fn watchdog(
         mut rx: mpsc::Receiver<String>,
         mut flushrx: mpsc::Receiver<oneshot::Sender<()>>,
-        submitter: TcpSubmitter,
+        submitter: Box<dyn Submitter + Sync + Send>,
     ) {
         let mut pending = Vec::new();
         loop {

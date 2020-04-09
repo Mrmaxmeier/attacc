@@ -77,7 +77,7 @@ impl ProcessConfig {
             }
         });
 
-        let mut delay = time::delay_for(self.timeout.clone());
+        let mut delay = time::delay_for(self.timeout);
 
         tokio::select! {
             _ = &mut delay => {

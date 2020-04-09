@@ -22,6 +22,8 @@ use std::path::Path;
 use std::time::{Duration, Instant};
 
 mod config;
+mod ctfapi;
+mod events;
 mod flaghandler;
 mod proc;
 mod submitter;
@@ -29,11 +31,10 @@ mod submitter;
 use config::{Config, Target};
 use submitter::FlagBatcher;
 
-const FLAG_REGEX: &str = r"FLAG\{[a-zA-Z0-9-_]{32}\}";
-
 const PRIMARY_KEY: &str = "IP";
 
 #[derive(Clap, Debug)]
+#[clap(name = "flagged - KISS Exploit-Thrower mit Niveau")]
 struct Opts {
     /// Config file path.
     #[clap(short = "c", long = "config", default_value = "attacc.json")]
@@ -43,6 +44,9 @@ struct Opts {
     stats_uri: Option<String>,
     /// Working directory. If ommited, the current working directory will be used
     path: Option<String>,
+    /// Choose flag submission backend and flag regex. Only neccesary if flagged was compiled with multiple backends
+    #[clap(long = "ctf-api")]
+    ctf_api: Option<String>,
 
     /// Debug mode: implies --concurrency=1 --stdout --stderr
     #[clap(short = "d", long = "debug")]
@@ -76,15 +80,13 @@ struct Opts {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut opts: Opts = Opts::parse();
 
-    let folder = opts.path.unwrap_or(".".into());
+    let folder = opts.path.unwrap_or_else(|| String::from("."));
     let mut config_path = Path::new(&folder).to_path_buf();
     config_path.push(&opts.config);
     dbg!(&config_path);
 
     let config_file = File::open(config_path).expect("failed to open config");
     let mut config: Config = serde_json::from_reader(config_file).expect("failed to parse json");
-
-    let flag_regex = regex::bytes::Regex::new(FLAG_REGEX).expect("invalid flag regex");
 
     if opts.debug {
         opts.concurrency = opts.concurrency.or(Some(1));
@@ -96,8 +98,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     config.interval = opts.interval.unwrap_or(config.interval);
     config.timeout = opts.timeout.unwrap_or(config.timeout);
 
+    let ctf_api = ctfapi::choose(opts.ctf_api);
+    let flag_regex = ctf_api.flag_regex.clone();
+
     if opts.debug || opts.dump_config {
-        config.explain(&flag_regex);
+        config.explain(&ctf_api);
     }
 
     let redis_connection = opts.stats_uri.map(|uri| {
@@ -111,8 +116,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
-    let submitter = submitter::TcpSubmitter::new("127.0.0.1:31337".parse().unwrap());
-    let flag_batcher = FlagBatcher::start(submitter);
+    let flag_batcher = FlagBatcher::start(ctf_api.submitter);
     let flag_handler = Arc::new(Mutex::new(flaghandler::FlagHandler::new(flag_batcher)));
 
     let process_config = proc::ProcessConfig {

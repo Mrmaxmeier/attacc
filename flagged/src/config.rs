@@ -1,8 +1,8 @@
-use regex::bytes::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::time::Duration;
 
+use crate::ctfapi::CTFApi;
 use std::collections::HashMap;
 use tokio::process::Command;
 
@@ -16,9 +16,10 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn explain(&self, flag_regex: &Regex) {
+    pub fn explain(&self, ctf_api: &CTFApi) {
         println!("Configuration:");
-        println!("| flag_regex: {:?}", flag_regex);
+        println!("| ctf_api: {:?}", ctf_api.name);
+        println!("| flag_regex: {:?}", ctf_api.flag_regex);
         println!("| concurrency: {:?}", self.concurrency);
         println!("| interval: {:?}", Duration::from_secs_f64(self.interval));
         println!("| timeout: {:?}", Duration::from_secs_f64(self.timeout));
