@@ -1,7 +1,7 @@
 //! ForcAD submitter:
 //! https://github.com/pomo-mondreganto/ForcAD/blob/master/backend/flag_submitter/tcp_server/server.py
 
-use crate::ctfapi::{CTFApi, Submitter};
+use crate::ctfapi::{CTFApi, Flag, Submitter};
 use regex::bytes::Regex;
 use std::io::{BufRead, BufReader, Write};
 
@@ -11,7 +11,7 @@ pub struct ForcadSubmitter {
 }
 
 impl Submitter for ForcadSubmitter {
-    fn submit_batch(&self, batch: &[String]) -> std::io::Result<()> {
+    fn submit_batch(&self, batch: &[Flag]) -> std::io::Result<()> {
         use std::net::TcpStream;
         let mut stream = TcpStream::connect(&self.addr)?;
 
@@ -38,7 +38,7 @@ impl Submitter for ForcadSubmitter {
             if status.ends_with('\n') {
                 status.truncate(size - 1);
             }
-            println!("{} -> {}", flag, status);
+            flag.set_verdict(status.clone());
             // TODO: send to redis and persist to disk?
             status.clear();
         }

@@ -1,31 +1,159 @@
 use chrono::DateTime;
+use redis::Commands;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
 
-pub struct Session {}
+pub struct Session {
+    session_id: Uuid,
+    redis: Option<redis::Client>,
+    connection: Option<redis::Connection>,
+}
+
+impl Session {
+    pub fn open(redis: Option<redis::Client>, announcement: SessionAnnouncement) -> Self {
+        let session_id = Uuid::new_v4();
+        let mut connection = redis.as_ref().map(|client| {
+            client
+                .get_connection_with_timeout(std::time::Duration::from_secs(1))
+                .expect("unable to connect to redis")
+        });
+        Self::publish(
+            connection.as_mut(),
+            session_id,
+            EventPayload::SessionAnnouncement(announcement),
+        );
+        Session {
+            connection,
+            session_id,
+            redis,
+        }
+    }
+
+    fn publish(
+        connection: Option<&mut redis::Connection>,
+        session_id: Uuid,
+        payload: EventPayload,
+    ) {
+        if let Some(connection) = connection {
+            let timestamp = chrono::offset::Utc::now();
+            let event = Event {
+                payload,
+                session_id,
+                timestamp,
+            };
+            let event = serde_json::to_string(&event).expect("failed to serialize event");
+            let _: () = connection
+                .publish("events", event)
+                .expect("failed to publish message to redis");
+        }
+    }
+
+    pub fn run_handle(&self, target: &crate::config::Target) -> SessionRunHandle {
+        let connection = self.redis.as_ref().map(|client| {
+            client
+                .get_connection_with_timeout(std::time::Duration::from_secs(1))
+                .expect("unable to connect to redis")
+        });
+
+        let run = Run {
+            id: Uuid::new_v4(),
+            target: target.env.clone(),
+            target_pkey: target.key.clone(),
+        };
+
+        SessionRunHandle {
+            connection,
+            session_id: self.session_id,
+            run,
+        }
+    }
+
+    pub fn start_interval(&mut self) {
+        Self::publish(
+            self.connection.as_mut(),
+            self.session_id,
+            EventPayload::IntervalStart,
+        )
+    }
+
+    pub fn end_interval(&mut self) {
+        Self::publish(
+            self.connection.as_mut(),
+            self.session_id,
+            EventPayload::IntervalEnd,
+        )
+    }
+}
+
+pub struct SessionRunHandle {
+    session_id: Uuid,
+    connection: Option<redis::Connection>,
+    run: Run,
+}
+
+impl SessionRunHandle {
+    fn publish(&mut self, payload: EventPayload) {
+        Session::publish(self.connection.as_mut(), self.session_id, payload);
+    }
+    pub fn start(&mut self) {
+        self.publish(EventPayload::RunStart(self.run.clone()))
+    }
+    pub fn timeout(&mut self) {
+        self.publish(EventPayload::RunTimeout(self.run.clone()))
+    }
+    pub fn exit(&mut self, exit_code: Option<i32>) {
+        self.publish(EventPayload::RunExit {
+            run: self.run.clone(),
+            exit_code,
+        })
+    }
+    pub fn stdout_line(&mut self, line: String) {
+        self.publish(EventPayload::StdoutLine {
+            run: self.run.clone(),
+            line,
+        })
+    }
+    pub fn stderr_line(&mut self, line: String) {
+        self.publish(EventPayload::StderrLine {
+            run: self.run.clone(),
+            line,
+        })
+    }
+    pub fn flag_match(&mut self, flag: String) {
+        self.publish(EventPayload::FlagMatch {
+            run: self.run.clone(),
+            flag,
+        })
+    }
+    pub fn flag_pending(&mut self, flag: String) {
+        self.publish(EventPayload::FlagPending {
+            run: self.run.clone(),
+            flag,
+        })
+    }
+    pub fn flag_verdict(&mut self, flag: String, verdict: String) {
+        // TODO: write to disk
+        self.publish(EventPayload::FlagVerdict {
+            run: self.run.clone(),
+            flag,
+            verdict,
+        })
+    }
+}
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SessionAnnouncement {
-    session_id: Uuid,
-    hostname: String,
-    path: String,
-    config: crate::config::Config,
+    pub hostname: String,
+    pub path: String,
+    pub config: crate::config::Config,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Run {
     id: Uuid,
     target_pkey: String,
-    target: HashMap<String, serde_json::Value>,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct Counters {
-    flags: u64,
-    unique_flags: u64,
-    runs: u64,
-    intervals: u64,
+    target: HashMap<String, String>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -39,11 +167,12 @@ pub struct Event {
 pub enum EventPayload {
     SessionAnnouncement(SessionAnnouncement),
     IntervalStart,
-    IntervalStop,
+    IntervalEnd,
     RunStart(Run),
-    RunStop {
+    RunTimeout(Run),
+    RunExit {
         run: Run,
-        exit_code: i32,
+        exit_code: Option<i32>,
     },
     StdoutLine {
         run: Run,
@@ -66,5 +195,4 @@ pub enum EventPayload {
         flag: String,
         verdict: String,
     },
-    Counters(Counters),
 }

@@ -1,11 +1,11 @@
-use crate::ctfapi::{CTFApi, Submitter};
+use crate::ctfapi::{CTFApi, Flag, Submitter};
 use regex::bytes::Regex;
 use std::io::{BufRead, BufReader, Write};
 
 pub struct SaarctfSubmitter;
 
 impl Submitter for SaarctfSubmitter {
-    fn submit_batch(&self, batch: &[String]) -> std::io::Result<()> {
+    fn submit_batch(&self, batch: &[Flag]) -> std::io::Result<()> {
         use std::net::TcpStream;
         let mut stream = TcpStream::connect("submission.ctf.saarland:31337")?;
         let mut data = Vec::new();

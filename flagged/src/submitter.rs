@@ -1,4 +1,4 @@
-use crate::ctfapi::Submitter;
+use crate::ctfapi::{Flag, Submitter};
 use std::time::Duration;
 use tokio::sync::{mpsc, oneshot};
 
@@ -6,7 +6,7 @@ const BATCH_SIZE_LIMIT: usize = 50;
 const BATCH_TIME_LIMIT: Duration = Duration::from_millis(1000);
 
 pub struct FlagBatcher {
-    pub tx: mpsc::Sender<String>,
+    pub tx: mpsc::Sender<Flag>,
     pub flushtx: mpsc::Sender<oneshot::Sender<()>>,
 }
 impl FlagBatcher {
@@ -18,7 +18,7 @@ impl FlagBatcher {
     }
 
     async fn watchdog(
-        mut rx: mpsc::Receiver<String>,
+        mut rx: mpsc::Receiver<Flag>,
         mut flushrx: mpsc::Receiver<oneshot::Sender<()>>,
         submitter: Box<dyn Submitter + Sync + Send>,
     ) {
@@ -65,7 +65,7 @@ impl FlagBatcher {
         }
     }
 
-    pub async fn submit(&mut self, flag: String) {
+    pub async fn submit(&mut self, flag: Flag) {
         self.tx
             .send(flag)
             .await

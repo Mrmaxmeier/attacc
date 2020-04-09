@@ -1,5 +1,8 @@
-use crate::submitter::FlagBatcher;
+use crate::events::SessionRunHandle;
+use crate::{ctfapi::Flag, submitter::FlagBatcher};
 use bloom::{BloomFilter, ASMS};
+use std::sync::Arc;
+use tokio::sync::Mutex;
 
 // Bloom filter tuned for high accuracy. These settings consume about 2 MB
 const FLAG_HISTORY_LIMIT: u32 = 1_000_000;
@@ -22,12 +25,16 @@ impl FlagHandler {
         }
     }
 
-    pub async fn submit(&mut self, flag: &str) -> bool {
+    pub async fn submit(&mut self, flag: &str, run_handle: Arc<Mutex<SessionRunHandle>>) -> bool {
+        // TODO: remove this for perf and also to prevent spam?
+        run_handle.lock().await.flag_match(flag.to_string());
         if self.seen.contains(&flag) {
             return false;
         }
 
-        self.submit_unique(flag).await;
+        // TODO: remove this for perf and also to prevent spam?
+        run_handle.lock().await.flag_pending(flag.to_string());
+        self.submit_unique(Flag::new(flag, &run_handle)).await;
 
         self.seen.insert(&flag);
         self.uniques += 1;
@@ -43,9 +50,8 @@ impl FlagHandler {
         true
     }
 
-    async fn submit_unique(&mut self, flag: &str) {
+    async fn submit_unique(&mut self, flag: Flag) {
         println!("UNIQ: {}", flag);
-        let flag = flag.to_string();
         self.flag_batcher.submit(flag).await;
     }
 

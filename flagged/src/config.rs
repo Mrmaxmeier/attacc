@@ -6,7 +6,7 @@ use crate::ctfapi::CTFApi;
 use std::collections::HashMap;
 use tokio::process::Command;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Config {
     pub command: Vec<String>,
     pub interval: f64,

@@ -18,7 +18,11 @@ pub struct ProcessConfig {
 }
 
 impl ProcessConfig {
-    pub async fn spawn(&self, target: Arc<Target>) {
+    pub async fn spawn(
+        &self,
+        target: Arc<Target>,
+        mut run_handle: crate::events::SessionRunHandle,
+    ) {
         let mut cmd = target.prepare();
 
         cmd.stdout(Stdio::piped());
@@ -28,6 +32,9 @@ impl ProcessConfig {
             Ok(child) => child,
             Err(err) => return eprintln!("cmd.spawn failed: {:?}", err),
         };
+
+        run_handle.start();
+        let run_handle = Arc::new(Mutex::new(run_handle));
 
         let stdout = child
             .stdout
@@ -44,14 +51,16 @@ impl ProcessConfig {
         let stdout_target = target.clone();
         let print_stdout = self.print_stdout;
         let flag_handler = self.flag_handler.clone();
+        let stdout_run_handle = run_handle.clone();
 
         tokio::spawn(async move {
             let pkey = &*stdout_target.key;
-            // FIXME: tokio bufreader probably breaks for non-utf8 output
+            // FIXME: tokio bufreader breaks for non-utf8 output
             while let Ok(Some(line)) = stdout_reader.next_line().await {
                 if print_stdout {
                     println!("{} | {}", pkey, line);
                 }
+                stdout_run_handle.lock().await.stdout_line(line.clone());
                 if flag_regex.is_match(line.as_bytes()) {
                     let flags = flag_regex
                         .find_iter(line.as_bytes())
@@ -59,7 +68,7 @@ impl ProcessConfig {
                         .collect::<Vec<_>>();
                     let mut handler = flag_handler.lock().await;
                     for flag in &flags {
-                        handler.submit(flag).await;
+                        handler.submit(flag, stdout_run_handle.clone()).await;
                     }
                 }
             }
@@ -68,12 +77,14 @@ impl ProcessConfig {
         let mut stderr = BufReader::new(stderr).lines();
         let stderr_target = target.clone();
         let print_stderr = self.print_stderr;
+        let stderr_run_handle = run_handle.clone();
         tokio::spawn(async move {
             let pkey = &*stderr_target.key;
             while let Ok(Some(line)) = stderr.next_line().await {
                 if print_stderr {
                     eprintln!("{} | {}", pkey, line);
                 }
+                stderr_run_handle.lock().await.stderr_line(line.clone());
             }
         });
 
@@ -85,12 +96,14 @@ impl ProcessConfig {
                     eprintln!("{}: failed to kill process: {:?}", target.key, err);
                 }
                 eprintln!("{}: killed due to missed deadline!", target.key);
+                run_handle.lock().await.timeout();
             }
             status = &mut child => {
                 let status = status.expect("child process encountered an error");
                 if print_stderr || print_stdout {
                     println!("{}: {}", target.key, status);
                 }
+                run_handle.lock().await.exit(status.code());
             }
         };
     }

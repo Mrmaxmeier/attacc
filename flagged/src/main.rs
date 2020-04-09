@@ -83,7 +83,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let folder = opts.path.unwrap_or_else(|| String::from("."));
     let mut config_path = Path::new(&folder).to_path_buf();
     config_path.push(&opts.config);
-    dbg!(&config_path);
 
     let config_file = File::open(config_path).expect("failed to open config");
     let mut config: Config = serde_json::from_reader(config_file).expect("failed to parse json");
@@ -105,12 +104,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         config.explain(&ctf_api);
     }
 
-    let redis_connection = opts.stats_uri.map(|uri| {
-        redis::Client::open(uri)
-            .expect("invalid redis uri")
-            .get_connection()
-            .expect("failed to connect to redis server")
-    });
+    let redis_client = opts
+        .stats_uri
+        .map(|uri| redis::Client::open(uri).expect("invalid redis uri"));
+
+    let path = std::fs::canonicalize(&folder).unwrap();
+    let hostname = hostname::get().unwrap().into_string().unwrap();
+    let mut events_session = events::Session::open(
+        redis_client,
+        events::SessionAnnouncement {
+            config: config.clone(),
+            hostname,
+            path: format!("{:?}", path),
+        },
+    );
 
     if opts.dump_config {
         return Ok(());
@@ -146,13 +153,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     loop {
         println!("Starting interval...");
+        events_session.start_interval();
         let started_at = Instant::now();
         for target in &targets {
             if active == config.concurrency {
                 jobs.next().await;
                 active -= 1;
             }
-            jobs.push(process_config.spawn(target.clone()));
+            let run_handle = events_session.run_handle(target);
+            jobs.push(process_config.spawn(target.clone(), run_handle));
             active += 1;
         }
 
@@ -165,6 +174,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         {
             flag_handler.lock().await.flush().await;
         }
+
+        events_session.end_interval();
 
         let elapsed = started_at.elapsed();
         if elapsed.as_secs_f64() >= config.interval {

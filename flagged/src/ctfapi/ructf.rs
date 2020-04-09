@@ -1,9 +1,9 @@
-use crate::ctfapi::{CTFApi, Submitter};
+use crate::ctfapi::{CTFApi, Flag, Submitter};
 use regex::bytes::Regex;
 
 struct HttpSubmitter;
 impl Submitter for HttpSubmitter {
-    fn submit_batch(&self, _batch: &[String]) -> std::io::Result<()> {
+    fn submit_batch(&self, _batch: &[Flag]) -> std::io::Result<()> {
         unimplemented!()
     }
 }
