@@ -93,6 +93,17 @@ pub struct SessionRunHandle {
 }
 
 impl SessionRunHandle {
+    pub fn noop() -> Self {
+        SessionRunHandle {
+            session_id: Uuid::default(),
+            connection: None,
+            run: Run {
+                id: Uuid::default(),
+                target: HashMap::new(),
+                target_pkey: "".into(),
+            },
+        }
+    }
     fn publish(&mut self, payload: EventPayload) {
         Session::publish(self.connection.as_mut(), self.session_id, payload);
     }

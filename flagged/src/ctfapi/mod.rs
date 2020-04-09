@@ -87,6 +87,7 @@ impl Submitter for NoopSubmitter {
 pub struct CTFApi {
     pub name: String,
     pub flag_regex: Regex,
+    pub test_flag: Option<String>,
     pub submitter: Box<dyn Submitter + Sync + Send>,
 }
 
@@ -94,6 +95,7 @@ fn ctf_apis() -> Vec<CTFApi> {
     vec![
         CTFApi {
             name: String::from("noop"),
+            test_flag: None,
             flag_regex: Regex::new(r"FLAG\{[a-zA-Z0-9-_]{32}\}").unwrap(),
             submitter: Box::new(NoopSubmitter),
         },
@@ -118,7 +120,6 @@ pub fn choose(name: Option<String>) -> CTFApi {
     }
 
     if apis.len() == 2 {
-        let _ = apis.pop();
         let target = apis.pop().unwrap();
         if let Some(name) = name {
             assert_eq!(target.name, name, "unable to satisfy ctfapi choice");

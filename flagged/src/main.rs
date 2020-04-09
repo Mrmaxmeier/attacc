@@ -1,13 +1,5 @@
 // TODOS:
 // - fix non-utf8 stdout
-// - publish data to redis
-// => each pubsub entry should contain some kind of uuid for the session, timestamp
-// => announce hostname, expoit name, config, ... on startup, keep this in redis `sessions/${uuid}`?
-// => announce interval start/end
-// => announce exploit run start, flags, stdout/err lines
-// => announce pending flags
-// => announce flag status returned by server
-// - support multiple events without recompiling? => introduce key in attacc.json?
 // - save stdout, stderr to disk?
 // - save flag status to disk?
 // - save interval index to disk => allow fair restarts?
@@ -121,6 +113,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     if opts.dump_config {
         return Ok(());
+    }
+
+    if let Some(test_flag) = ctf_api.test_flag.as_ref() {
+        println!("Submitting test flag {:?}...", test_flag);
+        let fake_run_handle = events::SessionRunHandle::noop();
+        let flag = ctfapi::Flag::new(&test_flag, &Arc::new(Mutex::new(fake_run_handle)));
+        ctf_api
+            .submitter
+            .submit_batch(&[flag])
+            .expect("failed to submit test flag")
     }
 
     let flag_batcher = FlagBatcher::start(ctf_api.submitter);

@@ -14,6 +14,7 @@ pub fn ctfapi() -> CTFApi {
     CTFApi {
         name: "ructf".into(),
         flag_regex,
+        test_flag: Some("TESTTESTTESTTESTTESTTESTTESTTES=".into()),
         submitter: Box::new(HttpSubmitter),
     }
 }

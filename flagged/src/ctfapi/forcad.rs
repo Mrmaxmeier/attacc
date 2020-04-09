@@ -4,6 +4,8 @@
 use crate::ctfapi::{CTFApi, Flag, Submitter};
 use regex::bytes::Regex;
 use std::io::{BufRead, BufReader, Write};
+use std::net::{TcpStream, ToSocketAddrs};
+use std::time::Duration;
 
 pub struct ForcadSubmitter {
     addr: String,
@@ -12,9 +14,13 @@ pub struct ForcadSubmitter {
 
 impl Submitter for ForcadSubmitter {
     fn submit_batch(&self, batch: &[Flag]) -> std::io::Result<()> {
-        use std::net::TcpStream;
-        let mut stream = TcpStream::connect(&self.addr)?;
-
+        let addr = self
+            .addr
+            .to_socket_addrs()
+            .expect("failed to resolve submission server")
+            .next()
+            .expect("failed to resovle submission server");
+        let mut stream = TcpStream::connect_timeout(&addr, Duration::from_secs(1))?;
         stream.write_all(self.team_token.as_bytes())?;
         stream.write_all(b"\n")?;
 
@@ -47,6 +53,7 @@ impl Submitter for ForcadSubmitter {
 pub fn ctfapi() -> CTFApi {
     CTFApi {
         name: String::from("forcad"),
+        test_flag: Some("TESTTESTTESTTESTTESTTESTTESTTES=".into()),
         flag_regex: Regex::new(r"\w{31}=").unwrap(),
         submitter: Box::new(ForcadSubmitter {
             addr: "10.10.10.10:31337".into(),

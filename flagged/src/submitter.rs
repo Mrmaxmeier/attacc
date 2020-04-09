@@ -53,7 +53,7 @@ impl FlagBatcher {
                 }
             }
 
-            while let Err(err) = submitter.submit_batch(&pending) {
+            while let Err(err) = tokio::task::block_in_place(|| submitter.submit_batch(&pending)) {
                 eprintln!("failed to submit batch: {:?}", err);
                 eprintln!("retrying...");
                 tokio::time::delay_for(BATCH_TIME_LIMIT).await;

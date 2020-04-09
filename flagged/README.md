@@ -30,11 +30,21 @@ OPTIONS:
 Example usages:
 
 ```console
+⋊> ~/_/a/example-exploit ⨯ flagged --ctf-api=noop
+Starting interval...
+UNIQ: FLAG{OWN_1fd75f057460bfbc54d6348de34f}
+[...]
+```
+
+```console
 cargo run -- ../example-exploit/ --interval 0.4 --timeout 0.3 --stats-uri redis://localhost --ctf-api=noop
 ```
 
 Portable build with hard-coded ctfapi:
 
 ```console
-cargo build --release --no-default-features --features ctfapi-saarctf --target x86_64-unknown-linux-musl
+⋊> ~/_/a/flagged $ cargo build --release --no-default-features --features ctfapi-saarctf --target x86_64-unknown-linux-musl
+⋊> ~/_/a/flagged $ cp target/x86_64-unknown-linux-musl/release/flagged ../example-exploit/
+⋊> ~/_/a/example-exploit $ ./flagged
+Submitting test flag "SAAR{TESTTESTTESTTESTTESTTESTTESTTEST}"...
 ```
