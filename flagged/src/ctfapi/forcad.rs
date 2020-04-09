@@ -31,16 +31,14 @@ impl Submitter for ForcadSubmitter {
         welcome.truncate(size);
         assert_eq!(welcome, "Now enter your flags, one in a line:\n");
 
-        let mut status = String::new();
         for flag in batch {
+            let mut status = String::new();
             let size = reader.read_line(&mut status)?;
             status.truncate(size);
             if status.ends_with('\n') {
                 status.truncate(size - 1);
             }
-            flag.set_verdict(status.clone());
-            // TODO: send to redis and persist to disk?
-            status.clear();
+            flag.set_verdict(status);
         }
         Ok(())
     }

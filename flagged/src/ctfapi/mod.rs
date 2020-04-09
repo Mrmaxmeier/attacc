@@ -1,4 +1,5 @@
 use regex::bytes::Regex;
+use std::sync::atomic;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
@@ -14,6 +15,7 @@ mod forcad;
 pub struct Flag {
     flag: String,
     run_handle: Arc<Mutex<crate::events::SessionRunHandle>>,
+    has_verdict: atomic::AtomicBool,
 }
 
 impl Flag {
@@ -21,9 +23,12 @@ impl Flag {
         Flag {
             flag: flag.to_string(),
             run_handle: run_handle.clone(),
+            has_verdict: false.into(),
         }
     }
+
     pub fn set_verdict(&self, verdict: String) {
+        self.has_verdict.store(true, atomic::Ordering::SeqCst);
         println!("{} -> {}", self.flag, verdict);
         let run_handle = self.run_handle.clone();
         let flag = self.flag.clone();
@@ -53,6 +58,18 @@ impl std::fmt::Display for Flag {
     }
 }
 
+impl Drop for Flag {
+    fn drop(&mut self) {
+        let verdict = self.has_verdict.load(atomic::Ordering::SeqCst);
+        if !verdict {
+            eprintln!(
+                "[WARN] flag {} dropped without setting verdict! ctfapi broken?",
+                self
+            );
+        }
+    }
+}
+
 pub trait Submitter {
     fn submit_batch(&self, batch: &[Flag]) -> std::io::Result<()>;
 }
@@ -61,16 +78,9 @@ struct NoopSubmitter;
 impl Submitter for NoopSubmitter {
     fn submit_batch(&self, batch: &[Flag]) -> std::io::Result<()> {
         for flag in batch {
-            println!("NoopSubmitter: {}", &**flag);
+            flag.set_verdict(format!("NoopSubmitter: {}", &flag[5..8]));
         }
         Ok(())
-    }
-}
-
-struct HttpSubmitter;
-impl Submitter for HttpSubmitter {
-    fn submit_batch(&self, _batch: &[Flag]) -> std::io::Result<()> {
-        unimplemented!()
     }
 }
 

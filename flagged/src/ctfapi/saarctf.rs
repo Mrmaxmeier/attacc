@@ -15,16 +15,14 @@ impl Submitter for SaarctfSubmitter {
         }
         stream.write_all(&data)?;
         let mut reader = BufReader::new(stream);
-        let mut status = String::new();
         for flag in batch {
+            let mut status = String::new();
             let size = reader.read_line(&mut status)?;
             status.truncate(size);
             if status.ends_with('\n') {
                 status.truncate(size - 1);
             }
-            println!("{} -> {}", flag, status);
-            // TODO: send to redis and persist to disk?
-            status.clear();
+            flag.set_verdict(status);
         }
         Ok(())
     }
