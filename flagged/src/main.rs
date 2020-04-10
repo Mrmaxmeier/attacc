@@ -1,5 +1,4 @@
-// TODOS:
-// - fix non-utf8 stdout
+// TODOs:
 // - save stdout, stderr to disk?
 // - save flag status to disk?
 // - save interval index to disk => allow fair restarts?

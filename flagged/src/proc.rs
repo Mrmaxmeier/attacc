@@ -47,7 +47,7 @@ impl ProcessConfig {
             .expect("child did not have a handle to stderr");
 
         let flag_regex = self.flag_regex.clone();
-        let mut stdout_reader = BufReader::new(stdout).lines();
+        let mut stdout_reader = BufReader::new(stdout);
         let stdout_target = target.clone();
         let print_stdout = self.print_stdout;
         let flag_handler = self.flag_handler.clone();
@@ -55,13 +55,21 @@ impl ProcessConfig {
 
         tokio::spawn(async move {
             let pkey = &*stdout_target.key;
-            // FIXME: tokio bufreader breaks for non-utf8 output
-            while let Ok(Some(line)) = stdout_reader.next_line().await {
+            let mut buf = Vec::new();
+            while let Ok(size) = stdout_reader.read_until(b'\n', &mut buf).await {
+                if size == 0 {
+                    break;
+                }
+                buf.truncate(size);
+                if buf.ends_with(b"\n") {
+                    buf.truncate(buf.len() - 1);
+                }
+                let line = String::from_utf8_lossy(&buf).to_string();
                 if print_stdout {
                     println!("{} | {}", pkey, line);
                 }
                 stdout_run_handle.lock().await.stdout_line(line.clone());
-                if flag_regex.is_match(line.as_bytes()) {
+                if flag_regex.is_match(&buf) {
                     let flags = flag_regex
                         .find_iter(line.as_bytes())
                         .map(|flag| String::from_utf8_lossy(flag.as_bytes()))
@@ -71,20 +79,31 @@ impl ProcessConfig {
                         handler.submit(flag, stdout_run_handle.clone()).await;
                     }
                 }
+                buf.clear();
             }
         });
 
-        let mut stderr = BufReader::new(stderr).lines();
+        let mut stderr_reader = BufReader::new(stderr);
         let stderr_target = target.clone();
         let print_stderr = self.print_stderr;
         let stderr_run_handle = run_handle.clone();
         tokio::spawn(async move {
             let pkey = &*stderr_target.key;
-            while let Ok(Some(line)) = stderr.next_line().await {
+            let mut buf = Vec::new();
+            while let Ok(size) = stderr_reader.read_until(b'\n', &mut buf).await {
+                if size == 0 {
+                    break;
+                }
+                buf.truncate(size);
+                if buf.ends_with(b"\n") {
+                    buf.truncate(buf.len() - 1);
+                }
+                let line = String::from_utf8_lossy(&buf).to_string();
                 if print_stderr {
                     eprintln!("{} | {}", pkey, line);
                 }
                 stderr_run_handle.lock().await.stderr_line(line.clone());
+                buf.clear();
             }
         });
 
