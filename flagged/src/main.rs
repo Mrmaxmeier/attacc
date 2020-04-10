@@ -39,6 +39,9 @@ struct Opts {
     /// Choose flag submission backend and flag regex. Only neccesary if flagged was compiled with multiple backends
     #[clap(long = "ctf-api")]
     ctf_api: Option<String>,
+    /// Team token might be required by submission backend
+    #[clap(long = "token")]
+    team_token: Option<String>,
 
     /// Debug mode: implies --concurrency=1 --stdout --stderr
     #[clap(short = "d", long = "debug")]

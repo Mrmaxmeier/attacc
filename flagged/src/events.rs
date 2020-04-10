@@ -43,8 +43,8 @@ impl Session {
                 timestamp,
             };
             let event = serde_json::to_string(&event).expect("failed to serialize event");
-            let _: () = connection
-                .publish("events", event)
+            connection
+                .publish::<_, _, ()>("events", event)
                 .expect("failed to publish message to redis");
         }
     }
@@ -59,7 +59,7 @@ impl Session {
         let run = Run {
             id: Uuid::new_v4(),
             target: target.env.clone(),
-            target_pkey: target.key.clone(),
+            key: target.key.clone(),
         };
 
         SessionRunHandle {
@@ -100,7 +100,7 @@ impl SessionRunHandle {
             run: Run {
                 id: Uuid::default(),
                 target: HashMap::new(),
-                target_pkey: "".into(),
+                key: "".into(),
             },
         }
     }
@@ -163,7 +163,7 @@ pub struct SessionAnnouncement {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Run {
     id: Uuid,
-    target_pkey: String,
+    key: String,
     target: HashMap<String, String>,
 }
 
@@ -175,6 +175,7 @@ pub struct Event {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+#[serde(tag = "t", content = "c")]
 pub enum EventPayload {
     SessionAnnouncement(SessionAnnouncement),
     IntervalStart,
