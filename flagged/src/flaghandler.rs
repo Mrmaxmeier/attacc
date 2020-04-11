@@ -27,12 +27,15 @@ impl FlagHandler {
 
     pub async fn submit(&mut self, flag: &str, run_handle: Arc<Mutex<SessionRunHandle>>) -> bool {
         // TODO: remove this for perf and also to prevent spam?
-        run_handle.lock().await.flag_match(flag.to_string());
-        if self.seen.contains(&flag) {
+        let is_unique = !self.seen.contains(&flag);
+        run_handle
+            .lock()
+            .await
+            .flag_match(flag.to_string(), is_unique);
+        if !is_unique {
             return false;
         }
 
-        // TODO: remove this for perf and also to prevent spam?
         run_handle.lock().await.flag_pending(flag.to_string());
         self.submit_unique(Flag::new(flag, &run_handle)).await;
 

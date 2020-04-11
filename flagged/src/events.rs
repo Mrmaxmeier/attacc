@@ -131,9 +131,10 @@ impl SessionRunHandle {
             line,
         })
     }
-    pub fn flag_match(&mut self, flag: String) {
+    pub fn flag_match(&mut self, flag: String, is_unique: bool) {
         self.publish(EventPayload::FlagMatch {
             run: self.run.clone(),
+            is_unique,
             flag,
         })
     }
@@ -197,6 +198,7 @@ pub enum EventPayload {
     FlagMatch {
         run: Run,
         flag: String,
+        is_unique: bool,
     },
     FlagPending {
         run: Run,
