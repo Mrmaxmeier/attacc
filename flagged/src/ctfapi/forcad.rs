@@ -33,6 +33,12 @@ impl Submitter for ForcadSubmitter {
         let mut reader = BufReader::new(stream);
 
         let mut welcome = String::new();
+
+        let size = reader.read_line(&mut welcome)?;
+        welcome.truncate(size);
+        assert_eq!(welcome, "Welcome! Please, enter your team token:\n");
+        welcome.clear();
+
         let size = reader.read_line(&mut welcome)?;
         welcome.truncate(size);
         assert_eq!(welcome, "Now enter your flags, one in a line:\n");

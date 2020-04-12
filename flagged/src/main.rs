@@ -2,6 +2,7 @@
 // - save stdout, stderr to disk?
 // - save flag status to disk?
 // - save interval index to disk => allow fair restarts?
+// - submit flags mode -> read from stdin
 
 use clap::Clap;
 use futures::stream::{FuturesUnordered, StreamExt};
