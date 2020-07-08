@@ -31,7 +31,13 @@ impl Flag {
     }
 
     pub fn set_verdict(&self, verdict: String) {
-        self.has_verdict.store(true, atomic::Ordering::SeqCst);
+        let had_verdict = self.has_verdict.swap(true, atomic::Ordering::SeqCst);
+        if had_verdict {
+            eprintln!(
+                "[WARN] duplicate verdict set for flag {}! ctfapi broken?",
+                self
+            );
+        }
         println!("{} -> {}", self.flag, verdict);
         let run_handle = self.run_handle.clone();
         let flag = self.flag.clone();
