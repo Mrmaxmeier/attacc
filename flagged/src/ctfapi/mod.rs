@@ -12,6 +12,9 @@ mod ructf;
 #[cfg(feature = "ctfapi-forcad")]
 mod forcad;
 
+#[cfg(feature = "ctfapi-faust")]
+mod faust;
+
 pub struct Flag {
     flag: String,
     run_handle: Arc<Mutex<crate::events::SessionRunHandle>>,
@@ -105,6 +108,8 @@ fn ctf_apis() -> Vec<CTFApi> {
         ructf::ctfapi(),
         #[cfg(feature = "ctfapi-forcad")]
         forcad::ctfapi(),
+        #[cfg(feature = "ctfapi-faust")]
+        faust::ctfapi(),
     ]
 }
 

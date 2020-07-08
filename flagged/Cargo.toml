@@ -20,7 +20,8 @@ uuid = { version = "0.8.1", features = ["serde", "v4"] }
 chrono = { version = "0.4.11", features = ["serde"] }
 
 [features]
-default = ["ctfapi-saarctf", "ctfapi-ructf", "ctfapi-forcad"]
+default = ["ctfapi-saarctf", "ctfapi-ructf", "ctfapi-forcad", "ctfapi-faust"]
 ctfapi-saarctf = []
 ctfapi-ructf = []
 ctfapi-forcad = []
+ctfapi-faust = []
