@@ -20,7 +20,18 @@ impl Submitter for FaustSubmitter {
             data.push(b'\n');
         }
         stream.write_all(&data)?;
+
         let mut reader = BufReader::new(stream);
+        let mut welcome = String::new();
+        let size = reader.read_line(&mut welcome)?;
+        welcome.truncate(size);
+        assert_eq!(welcome, "Flag submission server\n");
+        welcome.clear();
+
+        let size = reader.read_line(&mut welcome)?;
+        welcome.truncate(size);
+        assert_eq!(welcome, "One flag per line please!\n");
+
         for flag in batch {
             let mut status = String::new();
             let size = reader.read_line(&mut status)?;
