@@ -15,6 +15,9 @@ mod forcad;
 #[cfg(feature = "ctfapi-faust")]
 mod faust;
 
+#[cfg(feature = "ctfapi-enowars")]
+mod enowars;
+
 pub struct Flag {
     flag: String,
     run_handle: Arc<Mutex<crate::events::SessionRunHandle>>,
@@ -116,6 +119,8 @@ fn ctf_apis() -> Vec<CTFApi> {
         forcad::ctfapi(),
         #[cfg(feature = "ctfapi-faust")]
         faust::ctfapi(),
+        #[cfg(feature = "ctfapi-enowars")]
+        enowars::ctfapi(),
     ]
 }
 
