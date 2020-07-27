@@ -1,5 +1,6 @@
 package attacc
 
+import java.time.LocalDateTime
 import java.util.UUID
 
 import io.circe._
@@ -17,7 +18,7 @@ final case class Config(
   interval: Double,
   timeout: Double,
   concurrency: Long,
-  targets: Array[Map[String, Map[String, Json]]])
+  targets: Array[Map[String, Json]])
 
 sealed trait EventPayload
 final case class SessionAnnouncement(hostname: String, path: String, config: Config) extends EventPayload
@@ -29,9 +30,12 @@ final case class RunExit(run: Run, exitCode: Int)                               
 final case class StdoutLine(run: Run, line: String)                                  extends EventPayload
 final case class StderrLine(run: Run, line: String)                                  extends EventPayload
 final case class FlagMatch(run: Run, flag: String, isUnique: Boolean)                extends EventPayload
+final case class FlagPending(run: Run, flag: String)                                 extends EventPayload
 final case class FlagVerdict(run: Run, flag: String, verdict: String)                extends EventPayload
 
-final case class Event(sessionId: UUID, timestamp: String, payload: EventPayload)
+final case class Event(sessionId: UUID, timestamp: LocalDateTime, payload: EventPayload) {
+  def json: Json = this.asInstanceOf[Event].asJson(Events.encodeEvent)
+}
 
 object Events {
   implicit val config: Configuration = Configuration.default.withSnakeCaseMemberNames
@@ -49,6 +53,7 @@ object Events {
     case e: StdoutLine          => wrapPayload("StdoutLine", e)
     case e: StderrLine          => wrapPayload("StderrLine", e)
     case e: FlagMatch           => wrapPayload("FlagMatch", e)
+    case e: FlagPending         => wrapPayload("FlagPending", e)
     case e: FlagVerdict         => wrapPayload("FlagVerdict", e)
   }
 
@@ -69,13 +74,17 @@ object Events {
         case "StdoutLine"          => requireC(_.as[StdoutLine])
         case "StderrLine"          => requireC(_.as[StderrLine])
         case "FlagMatch"           => requireC(_.as[FlagMatch])
+        case "FlagPending"         => requireC(_.as[FlagPending])
         case "FlagVerdict"         => requireC(_.as[FlagVerdict])
       }
     } yield result
   }
 
+  implicit val encodeTimestamp: Encoder[LocalDateTime] = Encoder.instance(Util.formatDateTime(_).asJson)
+  implicit val decodeTimestamp: Decoder[LocalDateTime] = Decoder.instance(_.as[String].map(Util.parseDateTime))
+
   implicit val decodeEvent: Decoder[Event] = deriveConfiguredDecoder[Event]
   implicit val encodeEvent: Encoder[Event] = deriveConfiguredEncoder[Event]
 
-  def decodeEvent(s: String): ZIO[Any, Error, Event] = ZIO.fromEither(decode[Event](s))
+  def decodeEvent(s: String): ZIO[Any, Throwable, Event] = ZIO.fromEither(decode[Event](s)).mapError(e => new Exception(s"couldn't decode $s, error: $e"))
 }

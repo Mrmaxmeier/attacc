@@ -1,108 +1,114 @@
 package attacc
 
+import java.time.LocalDateTime
 import java.util.UUID
 
+import attacc.ApplicationState.Session
+import attacc.Main.ApplicationEnv
+import attacc.config.ConfigEnv
 import attacc.observables.{ObservableList, ObservableMap, ObservableStore, ObservableValue}
 import zio.ZIO
 import io.circe.generic.auto._
 
-case class ObservableFlag(
-  flag: String,
-  run: UUID,
-  timestamp: String,
-  unique: Boolean,
-  verdict: ObservableValue[Option[String]])
-object ObservableFlag {
-  def create(flag: String, run: UUID, timestamp: String, unique: Boolean): ZIO[ObservableStore, Throwable, ObservableFlag] =
-    for {
-      verdict <- ObservableStore.createValue[Option[String]](None)
-    } yield ObservableFlag(flag, run, timestamp, unique, verdict)
-}
+case class ApplicationState(sessions: ObservableMap[UUID, Session], validFlags: ObservableList[String])
 
-case class Line(line: String, timestamp: String)
+object ApplicationState {
 
-case class ObservableRun(
-  id: UUID,
-  session: UUID,
-  interval: UUID,
-  targetPkey: String,
-  target: Map[String, String],
-  startTime: String,
-  exitCode: ObservableValue[Option[Int]],
-  endTime: ObservableValue[Option[String]],
-  timeouted: ObservableValue[Boolean],
-  outLines: ObservableList[Line],
-  errLines: ObservableList[Line],
-  flags: ObservableList[ObservableFlag])
-object ObservableRun {
-  def create(
+  case class Line(line: String, timestamp: LocalDateTime)
+
+  case class Run(
     id: UUID,
     session: UUID,
     interval: UUID,
     targetPkey: String,
     target: Map[String, String],
-    startTime: String
-  ): ZIO[ObservableStore, Throwable, ObservableRun] =
-    for {
-      exitCode  <- ObservableStore.createValue[Option[Int]](None)
-      endTime   <- ObservableStore.createValue[Option[String]](None)
-      timeouted <- ObservableStore.createValue(false)
-      outLines  <- ObservableStore.createList[Line]
-      errLines  <- ObservableStore.createList[Line]
-      flags     <- ObservableStore.createList[ObservableFlag]
-    } yield (ObservableRun(id, session, interval, targetPkey, target, startTime, exitCode, endTime, timeouted, outLines, errLines, flags))
-}
+    startTime: LocalDateTime,
+    exitCode: ObservableValue[Option[Int]],
+    endTime: ObservableValue[Option[LocalDateTime]],
+    timeouted: ObservableValue[Boolean],
+    outLines: ObservableList[Line],
+    errLines: ObservableList[Line])
 
-case class ObservableInterval(
-  id: UUID,
-  session: UUID,
-  startTime: String,
-  endTime: ObservableValue[Option[String]],
-  runs: ObservableList[UUID])
-object ObservableInterval {
-  def create(id: UUID, session: UUID, startTime: String): ZIO[ObservableStore, Throwable, ObservableInterval] =
-    for {
-      endTime <- ObservableStore.createValue[Option[String]](None)
-      runs    <- ObservableStore.createList[UUID]
-    } yield ObservableInterval(id, session, startTime, endTime, runs)
-}
+  object Run {
+    def create(
+      id: UUID,
+      session: UUID,
+      interval: UUID,
+      targetPkey: String,
+      target: Map[String, String],
+      startTime: LocalDateTime
+    ): ZIO[ApplicationEnv, Throwable, Run] =
+      for {
+        exitCode  <- ObservableStore.createValue[Option[Int]](None)
+        endTime   <- ObservableStore.createValue[Option[LocalDateTime]](None)
+        timeouted <- ObservableStore.createValue(false)
+        config    <- ConfigEnv.config[ApplicationEnv]
+        outLines  <- ObservableStore.createList[Line](config.statsConfig.lastOutputLines)
+        errLines  <- ObservableStore.createList[Line](config.statsConfig.lastOutputLines)
+      } yield Run(id, session, interval, targetPkey, target, startTime, exitCode, endTime, timeouted, outLines, errLines)
+  }
 
-case class ObservableSession(
-  id: UUID,
-  hostname: String,
-  path: String,
-  config: Config,
-  startTime: String,
-  intervals: ObservableMap[UUID, ObservableInterval],
-  activeInterval: ObservableValue[Option[UUID]])
-object ObservableSession {
-  def create(
+  case class Interval(
+    id: UUID,
+    session: UUID,
+    startTime: LocalDateTime,
+    endTime: ObservableValue[Option[LocalDateTime]],
+    runs: ObservableList[UUID])
+
+  object Interval {
+    def create(id: UUID, session: UUID, startTime: LocalDateTime): ZIO[ApplicationEnv, Throwable, Interval] =
+      for {
+        endTime <- ObservableStore.createValue[Option[LocalDateTime]](None)
+        runs    <- ObservableStore.createList[UUID]
+      } yield Interval(id, session, startTime, endTime, runs)
+  }
+
+  case class Session(
     id: UUID,
     hostname: String,
     path: String,
     config: Config,
-    startTime: String
-  ): ZIO[ObservableStore, Throwable, ObservableSession] =
-    for {
-      intervals      <- ObservableStore.createMap[UUID, ObservableInterval]
-      activeInterval <- ObservableStore.createValue[Option[UUID]](None)
-    } yield ObservableSession(id, hostname, path, config, startTime, intervals, activeInterval)
-}
+    startTime: LocalDateTime,
+    acceptedFlags: ObservableValue[Long],
+    runCounter: ObservableValue[Long],
+    intervals: ObservableMap[UUID, Interval],
+    activeInterval: ObservableValue[Option[UUID]],
+    runMap: ObservableMap[UUID, Int],
+    runs: ObservableList[Run])
 
-case class ApplicationState(sessions: ObservableMap[UUID, ObservableSession], runs: ObservableMap[UUID, ObservableRun])
-object ApplicationState {
-  private def create: ZIO[ObservableStore, Throwable, ApplicationState] =
+  object Session {
+    def create(
+      id: UUID,
+      hostname: String,
+      path: String,
+      config: Config,
+      startTime: LocalDateTime
+    ): ZIO[ApplicationEnv, Throwable, Session] =
+      for {
+        intervals      <- ObservableStore.createMap[UUID, Interval]
+        activeInterval <- ObservableStore.createValue[Option[UUID]](None)
+        runMap         <- ObservableStore.createMap[UUID, Int]
+        cfg            <- ConfigEnv.config[ApplicationEnv]
+        runs           <- ObservableStore.createList[Run](cfg.statsConfig.lastRuns)
+        acceptedFlags  <- ObservableStore.createValue(0L)
+        runCounter     <- ObservableStore.createValue(0L)
+      } yield Session(id, hostname, path, config, startTime, acceptedFlags, runCounter, intervals, activeInterval, runMap, runs)
+  }
+
+  private def create: ZIO[ApplicationEnv, Throwable, ApplicationState] =
     for {
-      sessions <- ObservableStore.createMap[UUID, ObservableSession]
-      runs     <- ObservableStore.createMap[UUID, ObservableRun]
-      state = ApplicationState(sessions, runs)
+      sessions   <- ObservableStore.createMap[UUID, Session]
+      config     <- ConfigEnv.config[ApplicationEnv]
+      validFlags <- ObservableStore.createList[String](config.statsConfig.lastFlags)
+      state = ApplicationState(sessions, validFlags)
       obsState <- ObservableStore.createValue(state)
       _        <- obsState.name("state")
     } yield state
 
-  def retrieveOrCreateState: ZIO[ObservableStore, Throwable, ApplicationState] =
+  def retrieveOrCreateState: ZIO[ApplicationEnv, Throwable, ApplicationState] =
     ObservableStore.retrieveValue[ApplicationState]("state").flatMap {
       case Some(state) => state.get
       case None        => create
     }
+
 }

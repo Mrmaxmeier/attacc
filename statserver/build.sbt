@@ -1,8 +1,7 @@
-val Http4sVersion   = "0.21.2"
+val Http4sVersion   = "1.0.0-M3"
 val CirceVersion    = "0.13.0"
-val ZIOVersion      = "1.0.0-RC18-2"
+val ZIOVersion      = "1.0.0-RC21-2"
 val SilencerVersion = "1.4.4"
-val RedisVersion    = "0.9.6"
 
 lazy val root = (project in file("."))
   .enablePlugins(GraalVMNativeImagePlugin)
@@ -24,8 +23,7 @@ lazy val root = (project in file("."))
       "-Ywarn-value-discard",
       "-Ywarn-numeric-widen",
       "-Ywarn-extra-implicit",
-      "-Ymacro-annotations",
-      "-Ywarn-unused:_"
+      "-Ymacro-annotations"
     ) ++ (if (isSnapshot.value) Seq.empty
           else
             Seq("-opt:l:inline")),
@@ -38,14 +36,13 @@ lazy val root = (project in file("."))
       "io.circe"              %% "circe-generic-extras" % CirceVersion,
       "io.circe"              %% "circe-parser"         % CirceVersion,
       "dev.zio"               %% "zio"                  % ZIOVersion,
-      "dev.profunktor"        %% "redis4cats-effects"   % RedisVersion,
-      "dev.profunktor"        %% "redis4cats-streams"   % RedisVersion,
-      "dev.zio"               %% "zio-logging-slf4j"    % "0.2.6",
-      "dev.zio"               %% "zio-interop-cats"     % "2.0.0.0-RC12",
-      "dev.zio"               %% "zio-macros-core"      % "0.5.0",
+      "dev.profunktor"        %% "redis4cats-effects"   % "0.9.6",
+      "dev.zio"               %% "zio-logging-slf4j"    % "0.3.2",
+      "dev.zio"               %% "zio-interop-cats"     % "2.1.4.0-RC17",
       "org.slf4j"             % "slf4j-log4j12"         % "1.7.26",
       "com.github.pureconfig" %% "pureconfig"           % "0.12.1",
       "com.lihaoyi"           %% "sourcecode"           % "0.1.7",
+      "io.lettuce"            % "lettuce-core"          % "6.0.0.M1",
       ("com.github.ghik" % "silencer-lib" % SilencerVersion % "provided")
         .cross(CrossVersion.full),
       // plugins

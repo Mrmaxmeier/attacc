@@ -2,7 +2,7 @@ package attacc
 
 import dev.profunktor.redis4cats.effect.Log
 import zio.ZIO
-import zio.logging.Logging.Logging
+import zio.logging.Logging
 import zio.logging.log
 
 object Instances {
