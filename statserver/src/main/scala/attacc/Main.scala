@@ -23,7 +23,7 @@ import org.http4s.server.Router
 object Main extends App {
 
   val baseLayer        = Slf4jLogger.make((_, msg) => msg) ++ ConfigEnv.default
-  val applicationLayer = ExploitEventSource.redisSource ++ InMemoryStore.inMemoryStore
+  val applicationLayer = ExploitEventSource.fileSource ++ InMemoryStore.inMemoryStore
   val customLayers     = baseLayer ++ applicationLayer
 
   type BaseEnv        = ZEnv with Logging with ConfigEnv
@@ -57,7 +57,7 @@ object Main extends App {
     ZIO.runtime[R].flatMap { implicit rts =>
       BlazeServerBuilder[Task](global)
         .bindHttp(config.port, config.host)
-        .withHttpApp(CORS(Router("api" -> ApiRoutes.routes(handler, metrics), "ws" -> WebsocketRoutes.routes(handler)).orNotFound))
+        .withHttpApp(CORS(Router("" -> ApiRoutes.routes(handler, metrics), "ws" -> WebsocketRoutes.routes(handler)).orNotFound))
         .serve
         .compile[Task, Task, cats.effect.ExitCode]
         .drain
