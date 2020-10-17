@@ -26,10 +26,12 @@ default = [
     "ctfapi-ructf",
     "ctfapi-forcad",
     "ctfapi-faust",
-    "ctfapi-enowars"
+    "ctfapi-enowars",
+    "ctfapi-mhackectf",
 ]
 ctfapi-saarctf = []
 ctfapi-ructf = []
 ctfapi-forcad = []
 ctfapi-faust = []
 ctfapi-enowars = []
+ctfapi-mhackectf = []

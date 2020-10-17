@@ -18,6 +18,9 @@ mod faust;
 #[cfg(feature = "ctfapi-enowars")]
 mod enowars;
 
+#[cfg(feature = "ctfapi-mhackectf")]
+mod mhackectf;
+
 pub struct Flag {
     flag: String,
     run_handle: Arc<Mutex<crate::events::SessionRunHandle>>,
@@ -121,6 +124,8 @@ fn ctf_apis() -> Vec<CTFApi> {
         faust::ctfapi(),
         #[cfg(feature = "ctfapi-enowars")]
         enowars::ctfapi(),
+        #[cfg(feature = "ctfapi-mhackectf")]
+        mhackectf::ctfapi(),
     ]
 }
 
