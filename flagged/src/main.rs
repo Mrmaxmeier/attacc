@@ -194,7 +194,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 Duration::from_secs_f64(config.interval) - elapsed
             );
             let deadline = started_at + Duration::from_secs_f64(config.interval);
-            tokio::time::delay_until(tokio::time::Instant::from_std(deadline)).await;
+            tokio::time::sleep_until(tokio::time::Instant::from_std(deadline)).await;
         }
     }
 }

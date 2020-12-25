@@ -36,10 +36,10 @@ impl FlagBatcher {
 
             let mut ack_tx = None;
 
-            let mut delay = tokio::time::delay_for(BATCH_TIME_LIMIT);
+            let deadline = tokio::time::Instant::now() + BATCH_TIME_LIMIT;
             loop {
                 tokio::select! {
-                    _ = &mut delay => {
+                    _ = tokio::time::sleep_until(deadline) => {
                         break;
                     }
                     item = rx.recv() => {
@@ -56,7 +56,7 @@ impl FlagBatcher {
             while let Err(err) = tokio::task::block_in_place(|| submitter.submit_batch(&pending)) {
                 eprintln!("failed to submit batch: {:?}", err);
                 eprintln!("retrying...");
-                tokio::time::delay_for(BATCH_TIME_LIMIT).await;
+                tokio::time::sleep(BATCH_TIME_LIMIT).await;
             }
             pending.clear();
             if let Some(ack_tx) = ack_tx {

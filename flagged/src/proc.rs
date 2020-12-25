@@ -107,17 +107,15 @@ impl ProcessConfig {
             }
         });
 
-        let mut delay = time::delay_for(self.timeout);
-
         tokio::select! {
-            _ = &mut delay => {
-                if let Err(err) = child.kill() {
+            _ = time::sleep(self.timeout) => {
+                if let Err(err) = child.kill().await {
                     eprintln!("{}: failed to kill process: {:?}", target.key, err);
                 }
                 eprintln!("{}: killed due to missed deadline!", target.key);
                 run_handle.lock().await.timeout();
             }
-            status = &mut child => {
+            status = child.wait() => {
                 let status = status.expect("child process encountered an error");
                 if print_stderr || print_stdout {
                     println!("{}: {}", target.key, status);
