@@ -29,7 +29,7 @@ const PRIMARY_KEY: &str = "IP";
 #[clap(name = "flagged - KISS Exploit-Thrower mit Niveau")]
 struct Opts {
     /// Config file path.
-    #[clap(short = "c", long = "config", default_value = "attacc.json")]
+    #[clap(short = 'c', long = "config", default_value = "attacc.json")]
     config: String,
     /// Report exploit status to redis. The URL format is redis://[:<passwd>@]<hostname>[:port][/<db>]
     #[clap(long = "stats-uri")]
@@ -44,7 +44,7 @@ struct Opts {
     team_token: Option<String>,
 
     /// Debug mode: implies --concurrency=1 --stdout --stderr
-    #[clap(short = "d", long = "debug")]
+    #[clap(short = 'd', long = "debug")]
     debug: bool,
     /// Print stdout of exploits
     #[clap(long = "stdout")]
