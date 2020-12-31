@@ -5,7 +5,7 @@ USAGE:
     flagged [FLAGS] [OPTIONS] [path]
 
 ARGS:
-    <path>    Working directory. If ommited, the current working directory will be used
+    <path>    Working directory. If omitted, the current working directory will be used
 
 FLAGS:
     -d, --debug          Debug mode: implies --concurrency=1 --stdout --stderr

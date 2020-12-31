@@ -34,7 +34,7 @@ struct Opts {
     /// Report exploit status to redis. The URL format is redis://[:<passwd>@]<hostname>[:port][/<db>]
     #[clap(long = "stats-uri")]
     stats_uri: Option<String>,
-    /// Working directory. If ommited, the current working directory will be used
+    /// Working directory. If omitted, the current working directory will be used
     path: Option<String>,
     /// Choose flag submission backend and flag regex. Only neccesary if flagged was compiled with multiple backends
     #[clap(long = "ctf-api")]
