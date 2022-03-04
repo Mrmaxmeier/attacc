@@ -4,7 +4,7 @@
 // - save interval index to disk => allow fair restarts?
 // - submit flags mode -> read from stdin
 
-use clap::Clap;
+use clap::Parser;
 use futures::stream::{FuturesUnordered, StreamExt};
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -25,7 +25,7 @@ use submitter::FlagBatcher;
 
 const PRIMARY_KEY: &str = "IP";
 
-#[derive(Clap, Debug)]
+#[derive(Parser, Debug)]
 #[clap(name = "flagged - KISS Exploit-Thrower mit Niveau")]
 struct Opts {
     /// Config file path.
